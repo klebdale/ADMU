@@ -3,12 +3,28 @@
     217095
     ADMU MSCS
     Python 2.7
-    Modifications from Sir Alampay's Djikstra Algo code to show path and cost of fastest path
+
+    BFS + Djikstra
+    Djikstra Algo is basically BFS but respecting the weight of the edges;
+    thus Djikstra Algo is used for FASTEST PATH ; BFS will be used for SHORTEST PATH
 """
+from collections import deque
+
 graph = {}
 costs = {}
 parents = {}
 processed = []
+
+
+def setup_graph_bfs():
+    graph["A"] = ["B", "C", "H"]
+    graph["B"] = ["D", "F"]
+    graph["C"] = ["E", "G"]
+    graph["D"] = []
+    graph["E"] = []
+    graph["F"] = []
+    graph["G"] = []
+    graph["H"] = []
 
 
 def setup_graph_1A():
@@ -70,6 +86,30 @@ def setup_graph_1B():
     parents["A"] = "start"
 
     return None
+
+
+def bfs_shortest_path(start_node, end_node):
+    explored = []
+    search_queue = [[start_node]]
+
+    if start_node == end_node:
+        return "Same Node"
+
+    while search_queue:
+        path = search_queue.pop(0)
+        node = path[-1]
+
+        if node not in explored:
+            neighbours = graph[node]
+
+            for neighbour in neighbours:
+                new_path = list(path)
+                new_path.append(neighbour)
+                search_queue.append(new_path)
+
+                if neighbour == end_node:
+                    return new_path
+            explored.append(node)
 
 
 """
@@ -136,12 +176,16 @@ def build_fastest_path(end_node):
     return fastest_path[::-1]
 
 
+def is_fastest_also_shortest(list1, list2):
+    return True if list1 == list2 else False
+
+
 def main():
     end_node = raw_input("Please enter desired end node: ")
 
     # Choose the graph by uncommenting it
-    # setup_graph_1A()
-    setup_graph_1B()
+    setup_graph_1A()
+    # setup_graph_1B()
     djikstra_algo()
 
     # print("Costs:")
@@ -150,6 +194,8 @@ def main():
     # for item in parents.items(): print(item)
 
     print("Fastest Path to {}: \n{} with cost of {}".format(end_node, build_fastest_path(end_node), costs[end_node]))
+    print("\nShortest Path to {}: \n{}".format(end_node, bfs_shortest_path("A", end_node)))
+    print("\nDjikstra and BFS Results same path? {}".format(is_fastest_also_shortest(build_fastest_path(end_node), bfs_shortest_path("A", end_node))))
 
 
 if __name__ == '__main__':
