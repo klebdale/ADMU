@@ -4,6 +4,11 @@
 """
 from numpy.random import randint
 from numpy.random import rand
+import numpy as np
+import random
+import cv2
+from PIL import Image as im
+
 """
 1) Randomly initialize populations p
 2) Determine fitness of population
@@ -14,38 +19,30 @@ from numpy.random import rand
       d) Calculate fitness for new population
 """
 """
-    Optimal Dog Breeds - maximization
-    Gene = breed(string), weight(float), body_fat(float 0-1), is_vacc(bool), has_won(bool), age(int), inteliigence(float)
-    Chromosome/Dog = list form of attributes i.e. ["Corgi", 45.1, 0.33, True, False, 3, 101]
-    Solution = pair of dogs
-    Population building = Have initial list of dogs and then pair them up?
-    i.e.    Dogs = [A, B, C]
-            Population = [[A,B], [A,C], [B,C]]
-    
+    Mona Lisa BnW - Minimization
+    Gene = each cell in the matrix
+    Chromosome = A matrix of mxm (reduced dimension)
+    Population = list of mxm matrices
+
     Fitness Function:
-        Poor = -1, Average = 0, Good = 1, Excellent = 2
-        
-        1.  If breed1 != breed2, score += 0; else score += 1
-        2.  If weight < 40, score += -1
-            If 40 <= weight <= 80, score += 1
-            If weight > 80, score += 0
-        3.  If 0 <= body_fat <= 0.25, score += 2
-            If 0.25 < body_fat <= 0.75, score += 0
-            If body_fat > 0.75, score += -1
-        4.  If (has_won) and (40 <= weight <= 80), score += 1
-            else score += 0
-        5.  If age in (1,2), score += 0
-            If age == 3, score += 1
-            If age in (4,5)
-                If has_won, score += -1
-                else score += -2
-        6. How will is_vacc and intelligence affect the score?
+        difference = (cell of ideal - cell of random)**2 
+        add the differences after all cells are computed.
+        So, if there are 64x64 cells, get the difference of the same coordinates and sum it all up
+        The closer to 0, the better
 """
 
 
 # Objective function
-def fitness_function(solution):
-    return sum(solution)
+def fitness_function(random_matrix):
+    score = 0
+    # TODO: Optimize for faster runtime
+    for row in range(0, m):
+        for col in range(0, m):
+            difference = ideal_reduced_matrix[row][col] - random_matrix[row][col]
+            score += (difference ** 2)
+            random_matrix[row][col] += random.uniform(0, difference)
+
+    return score
 
 
 # Selection by tournament
@@ -61,51 +58,100 @@ def selection(population, scores, k=2):
 
 # Crossover
 def crossover(parent1, parent2, probability_crossover):
-    # Children are copies of parents by default
+    # Children are copies of parents by default. each child is a matrix
     child1, child2 = parent1.copy(), parent2.copy()
     if rand() < probability_crossover:
-        # select a crossover point that is not at the end of the string
-        pt = randint(1, len(parent1) - 2)
+        # Swap the rows
+        pt = randint(1, m - 2)
         # perform crossover
-        child1 = parent1[:pt] + parent2[pt:]
-        child2 = parent2[:pt] + parent1[pt:]
+        child1 = np.concatenate((parent1[:pt], parent2[pt:]))
+        child2 = np.concatenate((parent2[:pt], parent1[pt:]))
     return [child1, child2]
 
 
 # Mutation
 def mutation(gene, probability_mutation):
-    for i in range(len(gene)):
-        # Check for a mutation
-        if rand() < probability_mutation:
-            # flip the bit
-            gene[i] = 1 - gene[i]
+    for i in range(m):
+        for j in range(m):
+            # Check for a mutation
+            if rand() < probability_mutation:
+                gene[i][j] = abs(1 - gene[i][j])
 
 
-n_pop = 1000
-n_bits = 6
-n_iter = 10
+def pic_to_float_array(img_path):
+    img = cv2.imread(img_path, 0)  # read image as grayscale. Set second parameter to 1 if rgb is required
+    new_img = img / 255.0
+    return np.array(new_img)
+
+
+def array_to_bw_pic(matrix, new_img_path):
+    my_array = (matrix * 255).astype(np.uint8)
+    img_new = im.fromarray(my_array)
+    img_new.save(new_img_path)
+
+
+# Setup for getting ideal matrix
+n = 256  # Dimension of Original Matrix (nxn)
+m = 64  # Dimension of Reduced Matrix (mxm)
+pics_file_path = '/Users/kleb/Desktop/GA_Pics/'
+np.set_printoptions(precision=2, suppress=True)  # Printing of floating point precisions
+
+orig_matrix = pic_to_float_array(pics_file_path + '1_monalisa_orig.jpg')
+array_to_bw_pic(orig_matrix, pics_file_path + '2_monalisa_bw.png')
+
+# Averaging to get the ideal matrix
+ave_list = []
+skip = 4
+for row in range(0, n - 1, skip):
+    for col in range(0, n - 1, skip):
+        ave_amt = orig_matrix[row][col] + orig_matrix[row][col + 1] + orig_matrix[row][col + 2] + orig_matrix[row][
+            col + 3]
+        ave_amt += orig_matrix[row + 1][col] + orig_matrix[row + 1][col + 1] + orig_matrix[row + 1][col + 2] + \
+                   orig_matrix[row + 1][col + 3]
+        ave_amt += orig_matrix[row + 2][col] + orig_matrix[row + 2][col + 1] + orig_matrix[row + 2][col + 2] + \
+                   orig_matrix[row + 1][col + 3]
+        ave_amt += orig_matrix[row + 3][col] + orig_matrix[row + 3][col + 1] + orig_matrix[row + 3][col + 2] + \
+                   orig_matrix[row + 1][col + 3]
+
+        ave_list.append(ave_amt / (skip ** 2))
+
+ideal_reduced_matrix = np.reshape(ave_list, (m, m))
+array_to_bw_pic(ideal_reduced_matrix, pics_file_path + '3_monalisa_bw_reduced.png')
+
+# GA starts here
+n_pop = 50
+n_iter = 1000
 probability_crossover = 0.5
-probability_mutation = 0.5
-population = [randint(0, 2, n_bits).tolist() for _ in range(n_pop)]
+probability_mutation = 0.1
 
+# Create a list of n_pop mxm matrices with random floating values (0-1)
+population = [np.random.random((m, m)) for _ in range(n_pop)]
 # Keep track of the best solution
-best_score, best_gene = 100000, fitness_function(population[0])
+best_score, best_matrix = 100000, population[0]
 
 for gen in range(n_iter):
+#gen = 0
+#while (best_score > 100):
+#    gen += 1
     print("Generation {}".format(gen))
+
     # Evaluation
     scores = [fitness_function(c) for c in population]
+
     # Check for the new best solution
     found = False
     for i in range(len(population)):
         if scores[i] < best_score:
-            best_score, best_gene = scores[i], population[i]
-            print("{} new best with score {}".format(best_gene, best_score))
+            best_score, best_matrix = scores[i], population[i]
+            print("{} new best with score {}".format(best_matrix, best_score))
             found = True
     if not found:
-        print("{} still the best with score {}".format(best_gene, best_score))
+        pass
+        # print("{} still the best with score {}".format(best_matrix, best_score))
+
     # Select parents
     parents = [selection(population, scores) for _ in range(n_pop)]
+
     # Create the next generation
     children = list()
     for i in range(0, n_pop, 2):
@@ -119,6 +165,9 @@ for gen in range(n_iter):
             children.append(child)
     # Replace the population
     population = children
+
 print("Timeline over...")
-print("Best Gene: {}".format(best_gene))
+print("Ideal Gene: {}".format(ideal_reduced_matrix))
+print("Best Gene: {}".format(best_matrix))
 print("Score: {}".format(best_score))
+array_to_bw_pic(best_matrix, pics_file_path + '4_monalisa_ga_result.png')
